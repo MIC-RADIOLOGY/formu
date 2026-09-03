@@ -12,6 +12,6 @@
   status = 200
 
 [[redirects]]
-  from = "/api/odds/*"
-  to = "/.netlify/functions/odds-api/:splat"
+  from = "/api/market-lines/*"
+  to = "/.netlify/functions/market-lines/:splat"
   status = 200

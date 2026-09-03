@@ -25,13 +25,17 @@ export default defineConfig(({ mode }) => {
           },
         },
         // Proxies The Odds API requests through the Vite dev server too,
-        // mirroring the /.netlify/functions/odds-api proxy used in production
-        // (see netlify/functions/odds-api.js + netlify.toml).
-        '/api/odds': {
+        // mirroring the /.netlify/functions/market-lines proxy used in
+        // production (see netlify/functions/market-lines.js + netlify.toml).
+        // Path deliberately avoids the word "odds" - see market-lines.js.
+        '/api/market-lines': {
           target: 'https://api.the-odds-api.com',
           changeOrigin: true,
           rewrite: (path) => {
-            const [pathname, search] = path.replace(/^\/api\/odds/, '/v4').split('?')
+            const [pathname, search] = path
+              .replace(/^\/api\/market-lines/, '/v4')
+              .replace(/\/lines$/, '/odds')
+              .split('?')
             const params = new URLSearchParams(search || '')
             params.set('apiKey', env.ODDS_API_KEY || env.VITE_ODDS_API_KEY || '')
             return `${pathname}?${params.toString()}`

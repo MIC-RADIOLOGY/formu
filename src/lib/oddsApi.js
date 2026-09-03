@@ -6,7 +6,7 @@
 // Routed through a Netlify Function proxy (netlify/functions/odds-api.js) so
 // the browser never calls api.the-odds-api.com directly - avoids CORS issues
 // blocking the fetch() call in production.
-const BASE_URL = "/api/odds";
+const BASE_URL = "/api/market-lines";
 
 // Sport keys we show in the app. Add/remove as you like -
 // full list: https://the-odds-api.com/sports-odds-data/sports-apis.html
@@ -23,7 +23,7 @@ export const LEAGUE_SPORT_KEYS = {
  * (the API key is attached server-side, not here).
  */
 async function fetchLeagueOdds(sportKey, { regions = "eu", markets = "h2h" } = {}) {
-  const url = `${BASE_URL}/sports/${sportKey}/odds?regions=${regions}&markets=${markets}&oddsFormat=decimal`;
+  const url = `${BASE_URL}/sports/${sportKey}/lines?regions=${regions}&markets=${markets}&oddsFormat=decimal`;
   const res = await fetch(url);
 
   if (!res.ok) {

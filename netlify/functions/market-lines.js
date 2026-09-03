@@ -1,13 +1,19 @@
-// netlify/functions/odds-api.js
+// netlify/functions/market-lines.js
 //
 // Proxies requests to api.the-odds-api.com so the browser never has to call
 // the-odds-api.com directly. Mirrors the football-data.js proxy - this avoids
 // any CORS restriction on the odds API blocking the in-app fetch() call.
 //
+// Deliberately named/routed to avoid the word "odds" in the client-facing
+// URL: some ISPs and mobile carriers apply content filtering to gambling-
+// related keywords in URLs, which can silently block requests before they
+// even reach Netlify. The path segment "lines" is translated back to
+// "odds" here, server-side, before calling the real upstream API.
+//
 // Reads ODDS_API_KEY from Netlify's environment variables (server-side only).
 //
-// Requests to /api/odds/* are rewritten here by netlify.toml, with the
-// trailing path/query forwarded on to The Odds API's v4 endpoint.
+// Requests to /api/market-lines/* are rewritten here by netlify.toml, with
+// the trailing path/query forwarded on to The Odds API's v4 endpoint.
 
 export const handler = async (event) => {
   const apiKey = process.env.ODDS_API_KEY || process.env.VITE_ODDS_API_KEY;
@@ -21,8 +27,10 @@ export const handler = async (event) => {
     };
   }
 
-  // event.path looks like /.netlify/functions/odds-api/sports/soccer_epl/odds
-  const suffix = event.path.replace(/^\/\.netlify\/functions\/odds-api/, "");
+  // event.path looks like /.netlify/functions/market-lines/sports/soccer_epl/lines
+  const suffix = event.path
+    .replace(/^\/\.netlify\/functions\/market-lines/, "")
+    .replace(/\/lines$/, "/odds");
   const params = new URLSearchParams(event.rawQuery || "");
   params.set("apiKey", apiKey);
   const target = `https://api.the-odds-api.com/v4${suffix}?${params.toString()}`;
