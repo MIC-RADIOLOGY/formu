@@ -23,8 +23,11 @@ export const handler = async (event) => {
     };
   }
 
-  // event.path looks like /.netlify/functions/football-data/competitions/PL/standings
-  const suffix = event.path.replace(/^\/\.netlify\/functions\/football-data/, "");
+  // event.path is the original request path, e.g.
+  // /api/football-data/competitions/PL/standings
+  const suffix = event.path
+    .replace(/^\/api\/football-data/, "")
+    .replace(/^\/\.netlify\/functions\/football-data/, "");
   const query = event.rawQuery ? `?${event.rawQuery}` : "";
   const target = `https://api.football-data.org/v4${suffix}${query}`;
 

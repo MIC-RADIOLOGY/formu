@@ -27,8 +27,10 @@ export const handler = async (event) => {
     };
   }
 
-  // event.path looks like /.netlify/functions/market-lines/sports/soccer_epl/lines
+  // event.path is the original request path, e.g.
+  // /api/market-lines/sports/soccer_epl/lines (not the internal function path)
   const suffix = event.path
+    .replace(/^\/api\/market-lines/, "")
     .replace(/^\/\.netlify\/functions\/market-lines/, "")
     .replace(/\/lines$/, "/odds");
   const params = new URLSearchParams(event.rawQuery || "");
