@@ -35,6 +35,19 @@ export const handler = async (event) => {
   params.set("apiKey", apiKey);
   const target = `https://api.the-odds-api.com/v4${suffix}?${params.toString()}`;
 
+  if (params.get("debug") === "1") {
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventPath: event.path,
+        rawQuery: event.rawQuery,
+        computedSuffix: suffix,
+        target: target.replace(apiKey, "REDACTED"),
+      }),
+    };
+  }
+
   try {
     const upstream = await fetch(target);
     const body = await upstream.text();
