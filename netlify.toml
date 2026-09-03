@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Client code always calls /api/football-data/... — this redirect sends
+# those requests to the serverless function in production, mirroring the
+# Vite dev-server proxy used locally (see vite.config.js).
+[[redirects]]
+  from = "/api/football-data/*"
+  to = "/.netlify/functions/football-data/:splat"
+  status = 200
