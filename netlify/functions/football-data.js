@@ -11,7 +11,7 @@
 // Requests to /api/football-data/* are rewritten here by netlify.toml,
 // with the trailing path forwarded on to football-data.org's v4 API.
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
   if (!apiKey) {
     return {

@@ -9,7 +9,7 @@
 // Requests to /api/odds/* are rewritten here by netlify.toml, with the
 // trailing path/query forwarded on to The Odds API's v4 endpoint.
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   const apiKey = process.env.ODDS_API_KEY || process.env.VITE_ODDS_API_KEY;
   if (!apiKey) {
     return {
