@@ -24,6 +24,19 @@ export default defineConfig(({ mode }) => {
             'X-Auth-Token': env.FOOTBALL_DATA_API_KEY || '',
           },
         },
+        // Proxies The Odds API requests through the Vite dev server too,
+        // mirroring the /.netlify/functions/odds-api proxy used in production
+        // (see netlify/functions/odds-api.js + netlify.toml).
+        '/api/odds': {
+          target: 'https://api.the-odds-api.com',
+          changeOrigin: true,
+          rewrite: (path) => {
+            const [pathname, search] = path.replace(/^\/api\/odds/, '/v4').split('?')
+            const params = new URLSearchParams(search || '')
+            params.set('apiKey', env.ODDS_API_KEY || env.VITE_ODDS_API_KEY || '')
+            return `${pathname}?${params.toString()}`
+          },
+        },
       },
     },
   }

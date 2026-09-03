@@ -10,3 +10,8 @@
   from = "/api/football-data/*"
   to = "/.netlify/functions/football-data/:splat"
   status = 200
+
+[[redirects]]
+  from = "/api/odds/*"
+  to = "/.netlify/functions/odds-api/:splat"
+  status = 200

@@ -3,8 +3,10 @@
 // Free tier: 500 requests/month, all sports including soccer.
 // Get a key at https://the-odds-api.com/ (no card required).
 
-const API_KEY = import.meta.env.VITE_ODDS_API_KEY;
-const BASE_URL = "https://api.the-odds-api.com/v4";
+// Routed through a Netlify Function proxy (netlify/functions/odds-api.js) so
+// the browser never calls api.the-odds-api.com directly - avoids CORS issues
+// blocking the fetch() call in production.
+const BASE_URL = "/api/odds";
 
 // Sport keys we show in the app. Add/remove as you like -
 // full list: https://the-odds-api.com/sports-odds-data/sports-apis.html
@@ -15,21 +17,13 @@ export const LEAGUE_SPORT_KEYS = {
   Bundesliga: "soccer_germany_bundesliga1",
 };
 
-function assertKey() {
-  if (!API_KEY) {
-    throw new Error(
-      "Missing VITE_ODDS_API_KEY. Add it to your .env file (see .env.example)."
-    );
-  }
-}
-
 /**
  * Fetch upcoming h2h (moneyline / 1X2) odds for one league.
- * Returns raw events from The Odds API.
+ * Returns raw events from The Odds API, via the server-side proxy
+ * (the API key is attached server-side, not here).
  */
 async function fetchLeagueOdds(sportKey, { regions = "eu", markets = "h2h" } = {}) {
-  assertKey();
-  const url = `${BASE_URL}/sports/${sportKey}/odds?regions=${regions}&markets=${markets}&oddsFormat=decimal&apiKey=${API_KEY}`;
+  const url = `${BASE_URL}/sports/${sportKey}/odds?regions=${regions}&markets=${markets}&oddsFormat=decimal`;
   const res = await fetch(url);
 
   if (!res.ok) {
