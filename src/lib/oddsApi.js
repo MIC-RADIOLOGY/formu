@@ -14,7 +14,7 @@ export const LEAGUE_SPORT_KEYS = {
   EPL: "soccer_epl",
   "La Liga": "soccer_spain_la_liga",
   "Serie A": "soccer_italy_serie_a",
-  Bundesliga: "soccer_germany_bundesliga1",
+  Bundesliga: "soccer_germany_bundesliga",
 };
 
 /**
