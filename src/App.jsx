@@ -177,6 +177,60 @@ const valueGap = (m) => {
 };
 const isValue = (m) => valueGap(m) >= 8;
 
+/**
+ * Build a "what to play" recommendation for a match, using only data we
+ * actually have real odds for: match winner (1X2) and total goals
+ * over/under (when a bookmaker offers it). We deliberately don't invent a
+ * corners suggestion - no data source here quotes real corners odds, and
+ * showing a fabricated number for something people bet money on would be
+ * worse than not showing it.
+ *
+ * "Best play" is picked by comparing how much the best available price
+ * beats the market average for each side - a bigger gap means it's more
+ * worth shopping around, not a claim about a hidden edge.
+ */
+function buildRecommendation(m) {
+  // Predicted winner: whichever side the (de-vigged) market odds favor most.
+  const sides = [
+    { key: "home", name: m.home, pred: m.pred.home, odds: m.odds.home, best: m.oddsBest?.home },
+    { key: "draw", name: "Draw", pred: m.pred.draw, odds: m.odds.draw, best: m.oddsBest?.draw },
+    { key: "away", name: m.away, pred: m.pred.away, odds: m.odds.away, best: m.oddsBest?.away },
+  ];
+  const favorite = sides.reduce((a, b) => (b.pred > a.pred ? b : a));
+
+  const winnerGapPct = favorite.best
+    ? Math.round(((favorite.best.price - favorite.odds) / favorite.odds) * 1000) / 10
+    : 0;
+
+  let totalsPick = null;
+  let totalsGapPct = 0;
+  if (m.totals) {
+    const favSide = m.totals.over.avg <= m.totals.under.avg ? "over" : "under";
+    const side = m.totals[favSide];
+    totalsPick = {
+      label: `${favSide === "over" ? "Over" : "Under"} ${m.totals.line} goals`,
+      avg: side.avg,
+      best: side.best,
+    };
+    totalsGapPct = side.best
+      ? Math.round(((side.best.price - side.avg) / side.avg) * 1000) / 10
+      : 0;
+  }
+
+  const useTotal = totalsPick && totalsGapPct > winnerGapPct;
+
+  return {
+    predictedWinner: favorite.name,
+    predictedWinnerPct: favorite.pred,
+    market: useTotal ? "Total goals" : "Match winner",
+    selection: useTotal ? totalsPick.label : `${favorite.name} to win`,
+    avgOdd: useTotal ? totalsPick.avg : favorite.odds,
+    bestOdd: useTotal ? totalsPick.best : favorite.best,
+    shopGapPct: useTotal ? totalsGapPct : winnerGapPct,
+    hasTotals: !!m.totals,
+  };
+}
+
 /* ---------------------------------------------------------------
    COUNT-UP (micro-interaction: numbers animate in)
 --------------------------------------------------------------- */
@@ -401,6 +455,10 @@ function MatchDetail({ m, onClose }) {
           </div>
         </Section>
 
+        <Section title="Recommended play">
+          <RecommendedPlay m={m} />
+        </Section>
+
         <Section title="Reason for pick">
           <ul style={{ margin: 0, paddingLeft: 18, color: T.text, fontSize: 13, lineHeight: 1.7 }}>
             {m.reasons.map((r, i) => (
@@ -446,6 +504,52 @@ function MatchDetail({ m, onClose }) {
   );
 }
 
+function RecommendedPlay({ m }) {
+  const rec = useMemo(() => buildRecommendation(m), [m]);
+  return (
+    <div style={{
+      background: `${T.blue}0F`, border: `1px solid ${T.blue}44`, borderRadius: 10, padding: 14,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+        <span style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>Predicted winner</span>
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: T.muted }}>{rec.predictedWinnerPct}% chance</span>
+      </div>
+      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 14 }}>
+        {rec.predictedWinner}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+        <span style={{ fontSize: 11, color: T.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>Suggested market</span>
+        <span style={{ fontSize: 11, color: T.blue, fontWeight: 600 }}>{rec.market}</span>
+      </div>
+      <div style={{ fontSize: 15, color: T.text, fontWeight: 600, marginBottom: 10 }}>{rec.selection}</div>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ flex: 1, background: T.surface, border: `1px solid ${T.line}`, borderRadius: 8, padding: "8px 10px" }}>
+          <div style={{ fontSize: 10, color: T.muted, marginBottom: 2 }}>Market average</div>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 15, color: T.text }}>{rec.avgOdd?.toFixed(2) ?? "—"}</div>
+        </div>
+        <div style={{ flex: 1, background: `${T.green}14`, border: `1px solid ${T.green}55`, borderRadius: 8, padding: "8px 10px" }}>
+          <div style={{ fontSize: 10, color: T.muted, marginBottom: 2 }}>Best available</div>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 15, color: T.green, fontWeight: 700 }}>
+            {rec.bestOdd ? rec.bestOdd.price.toFixed(2) : "—"}
+          </div>
+        </div>
+      </div>
+      {rec.bestOdd && (
+        <div style={{ fontSize: 12, color: T.muted, marginTop: 8 }}>
+          Best price at <b style={{ color: T.text }}>{rec.bestOdd.book}</b>
+          {rec.shopGapPct > 0 ? ` · ${rec.shopGapPct}% better than average` : ""}
+        </div>
+      )}
+      {!rec.hasTotals && (
+        <div style={{ fontSize: 11, color: T.muted, marginTop: 10, borderTop: `1px solid ${T.line}`, paddingTop: 8 }}>
+          Total-goals odds aren't offered by any bookmaker for this match yet. Corners markets aren't available from our data source.
+        </div>
+      )}
+    </div>
+  );
+}
 function StatBox({ label, value, suffix = "" }) {
   const n = useCountUp(value, 600);
   return (

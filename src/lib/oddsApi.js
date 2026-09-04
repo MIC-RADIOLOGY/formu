@@ -22,7 +22,7 @@ export const LEAGUE_SPORT_KEYS = {
  * Returns raw events from The Odds API, via the server-side proxy
  * (the API key is attached server-side, not here).
  */
-async function fetchLeagueOdds(sportKey, { regions = "eu", markets = "h2h" } = {}) {
+async function fetchLeagueOdds(sportKey, { regions = "eu", markets = "h2h,totals" } = {}) {
   const url = `${BASE_URL}/sports/${sportKey}/lines?regions=${regions}&markets=${markets}&oddsFormat=decimal`;
   const res = await fetch(url);
 
@@ -38,16 +38,68 @@ async function fetchLeagueOdds(sportKey, { regions = "eu", markets = "h2h" } = {
   return res.json();
 }
 
-/** Average the h2h price for an outcome across all bookmakers in an event. */
-function averagePrice(event, outcomeName) {
+/** Average the price for an outcome (in a given market) across all bookmakers in an event. */
+function averagePrice(event, outcomeName, marketKey = "h2h") {
   const prices = [];
   for (const bookmaker of event.bookmakers || []) {
-    const market = bookmaker.markets?.find((m) => m.key === "h2h");
+    const market = bookmaker.markets?.find((mk) => mk.key === marketKey);
     const outcome = market?.outcomes?.find((o) => o.name === outcomeName);
     if (outcome) prices.push(outcome.price);
   }
   if (!prices.length) return null;
   return Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100;
+}
+
+/** Highest price for an outcome across all bookmakers - i.e. the best price to actually take. */
+function bestPrice(event, outcomeName, marketKey = "h2h") {
+  let best = null;
+  for (const bookmaker of event.bookmakers || []) {
+    const market = bookmaker.markets?.find((mk) => mk.key === marketKey);
+    const outcome = market?.outcomes?.find((o) => o.name === outcomeName);
+    if (outcome && (!best || outcome.price > best.price)) {
+      best = { price: outcome.price, book: bookmaker.title };
+    }
+  }
+  return best;
+}
+
+/**
+ * Extract the Over/Under goals market for the most commonly quoted line
+ * (usually 2.5). Returns null if no bookmaker offers a totals market for
+ * this event - not every match/league has one on the free tier.
+ */
+function extractTotals(event) {
+  const pointCounts = new Map();
+  for (const bookmaker of event.bookmakers || []) {
+    const market = bookmaker.markets?.find((mk) => mk.key === "totals");
+    const point = market?.outcomes?.[0]?.point;
+    if (point !== undefined) pointCounts.set(point, (pointCounts.get(point) || 0) + 1);
+  }
+  if (!pointCounts.size) return null;
+  const line = [...pointCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+
+  const priceFor = (name) => {
+    const prices = [];
+    let best = null;
+    for (const bookmaker of event.bookmakers || []) {
+      const market = bookmaker.markets?.find((mk) => mk.key === "totals");
+      const outcome = market?.outcomes?.find((o) => o.name === name && o.point === line);
+      if (outcome) {
+        prices.push(outcome.price);
+        if (!best || outcome.price > best.price) best = { price: outcome.price, book: bookmaker.title };
+      }
+    }
+    if (!prices.length) return null;
+    return {
+      avg: Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100,
+      best,
+    };
+  };
+
+  const over = priceFor("Over");
+  const under = priceFor("Under");
+  if (!over || !under) return null;
+  return { line, over, under };
 }
 
 /** Simple market-implied probability model (no real prediction model - see note below). */
@@ -88,6 +140,12 @@ export async function fetchMatches(leagueNames = Object.keys(LEAGUE_SPORT_KEYS))
             away: averagePrice(event, event.away_team),
           };
           if (!odds.home || !odds.draw || !odds.away) return null; // skip incomplete markets
+          const oddsBest = {
+            home: bestPrice(event, event.home_team),
+            draw: bestPrice(event, "Draw"),
+            away: bestPrice(event, event.away_team),
+          };
+          const totals = extractTotals(event);
           const pred = impliedProbabilities(odds);
           const bookCount = event.bookmakers?.length || 0;
 
@@ -103,6 +161,8 @@ export async function fetchMatches(leagueNames = Object.keys(LEAGUE_SPORT_KEYS))
             minute: "2-digit",
           }),
           odds,
+          oddsBest, // best (highest) available price per outcome + which bookmaker offers it
+          totals,   // { line, over: {avg, best}, under: {avg, best} } or null if not offered
           pred: pred || { home: 33, draw: 34, away: 33 },
           confidence: Math.min(95, 30 + bookCount * 8),
           // The fields below aren't in The Odds API's h2h response - left blank
